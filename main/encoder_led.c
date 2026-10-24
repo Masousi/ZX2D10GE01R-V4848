@@ -8,6 +8,11 @@
 //   arc-en-ciel, comètes croisées, respiration, étincelles, théâtre, plasma). La moindre action sur
 //   l'encodeur rend immédiatement la main à l'animation interactive.
 // Réglages : menuconfig > ZX2D10 Demo > Encoder LED ring (nombre de LED, sens, luminosité : 255 = 100 % par défaut).
+// ⚫ AJOUTÉ (24/10/2026) : 8e animation "Random" (effet n°7) : chaque LED s'allume, tient et s'éteint
+//   au hasard (couleur, saturation, intensité et durées aléatoires), avec des événements imprévisibles
+//   (rafales sur tout l'anneau, comètes de vitesse / sens / couleur aléatoires).
+// ⚫ AJOUTÉ (24/10/2026) : animation choisie depuis la démo "LED animations" (encoder_led_set_mode) :
+//   un des 8 effets en continu ; par défaut (ENC_LED_MODE_AUTO) enchaînement des 7 effets, comme avant.
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
@@ -20,6 +25,8 @@
 #include "board.h"
 #include "mt8901.h"
 #include "ws2812.h"
+// ⚫ AJOUTÉ (24/10/2026) : API publique (choix de l'animation)
+#include "encoder_led.h"
 
 #if CONFIG_APP_ENCODER_LED
 
@@ -42,6 +49,32 @@ typedef struct { float r, g, b; } rgbf_t;      // couleur 0..1 (avant luminosit�
 static uint8_t s_level[LED_COUNT];   // intensité courante de chaque LED (0..255)
 static float s_spark[LED_COUNT];     // ⚫ 24/10/2026 : intensité des étincelles (effet 4)
 static float s_spark_hue[LED_COUNT];
+
+// ⚫ AJOUTÉ (24/10/2026) : animation choisie depuis la démo "LED animations" (écrit par la tâche LVGL)
+static volatile int s_mode = ENC_LED_MODE_AUTO;
+static volatile bool s_kick;         // démarrer l'animation tout de suite (après validation à l'écran)
+
+#define FX_ENDLESS UINT32_MAX        // effet choisi : jamais de transition
+static int s_cur_fx, s_next_fx;      // effet courant / suivant (fondu enchaîné en mode AUTO)
+static uint32_t s_in_fx;             // images écoulées dans l'effet courant
+static uint32_t s_fx_len;            // durée de l'effet courant (images)
+
+// ⚫ AJOUTÉ (24/10/2026) : état de l'animation Random (effet n°7)
+typedef enum { RND_OFF, RND_RISE, RND_HOLD, RND_FALL } rnd_phase_t;
+typedef struct {
+    rnd_phase_t phase;
+    float level;     // intensité courante (0..1)
+    float target;    // intensité visée en fin de montée
+    float step;      // variation par image (montée ou descente)
+    float hue, sat;
+    uint32_t wait;   // images restantes (extinction ou maintien)
+} rnd_led_t;
+static rnd_led_t s_rnd[LED_COUNT];
+static struct {                      // comète aléatoire superposée
+    bool on;
+    float pos, vel, hue, width;      // position (LED), vitesse (LED/image), couleur, largeur
+    uint32_t left;                   // images restantes
+} s_rnd_comet;
 
 // ⚫ 24/10/2026 : teinte (0..1, cyclique) -> RGB saturé
 static rgbf_t hsv(float h, float s, float v)
@@ -97,6 +130,16 @@ static rgbf_t show_effect(int fx, int i, float t)
         float v = ((i + step) % 3 == 0) ? 1.0f : 0.06f;
         return hsv(t * 0.2f + i / n * 0.5f, 1, v);
     }
+    // ⚫ AJOUTÉ (24/10/2026) : Random : LED indépendantes aléatoires + comète aléatoire (cf. random_update)
+    case ENC_LED_FX_RANDOM: {
+        rgbf_t c = hsv(s_rnd[i].hue, s_rnd[i].sat, s_rnd[i].level);
+        if (s_rnd_comet.on) {
+            float v = expf(-ring_dist(i, s_rnd_comet.pos) / s_rnd_comet.width);
+            rgbf_t k = hsv(s_rnd_comet.hue, 1, v);
+            c = (rgbf_t){fminf(c.r + k.r, 1), fminf(c.g + k.g, 1), fminf(c.b + k.b, 1)};
+        }
+        return c;
+    }
     default: {  // plasma : superposition de vagues sinusoïdales de teintes
         float w = sinf(i * 0.9f + t * 2.0f) + sinf(i * 0.4f - t * 1.3f);
         return hsv(t * 0.05f + w * 0.25f, 1, 0.55f + 0.45f * sinf(i * 0.7f + t * 3.0f));
@@ -109,6 +152,96 @@ static uint8_t to_led(float c)   // 0..1 -> 0..LED_MAX avec correction gamma (co
     if (c <= 0) return 0;
     if (c > 1) c = 1;
     return (uint8_t)(c * c * LED_MAX + 0.5f);
+}
+
+// ⚫ AJOUTÉ (24/10/2026) : réel aléatoire dans [a, b] / durée aléatoire en images
+static float frand(float a, float b)
+{
+    return a + (b - a) * ((esp_random() & 0xFFFFFF) / (float)0xFFFFFF);
+}
+
+static uint32_t rand_frames(float ms_min, float ms_max)
+{
+    return (uint32_t)(frand(ms_min, ms_max) / FRAME_MS) + 1;
+}
+
+// ⚫ AJOUTÉ (24/10/2026) : Random : fait évoluer chaque LED (éteinte -> montée -> maintien -> descente)
+// avec des couleurs et des durées aléatoires, et déclenche au hasard rafales et comètes
+static void random_update(void)
+{
+    // rafale : tout l'anneau s'allume d'un coup dans une même famille de couleur
+    if ((esp_random() % 400) == 0) {
+        float base = frand(0, 1);
+        for (int i = 0; i < LED_COUNT; i++) {
+            s_rnd[i].phase  = RND_RISE;
+            s_rnd[i].hue    = base + frand(-0.06f, 0.06f);
+            s_rnd[i].sat    = frand(0.6f, 1);
+            s_rnd[i].target = frand(0.7f, 1);
+            s_rnd[i].step   = s_rnd[i].target / rand_frames(20, 200);
+        }
+    }
+    // comète : sens, vitesse, couleur, largeur et durée aléatoires
+    if (!s_rnd_comet.on && (esp_random() % 250) == 0) {
+        s_rnd_comet.on    = true;
+        s_rnd_comet.pos   = frand(0, LED_COUNT);
+        s_rnd_comet.vel   = frand(2, 25) * FRAME_MS / 1000.0f * ((esp_random() & 1) ? 1 : -1);
+        s_rnd_comet.hue   = frand(0, 1);
+        s_rnd_comet.width = frand(0.5f, 2.5f);
+        s_rnd_comet.left  = rand_frames(500, 4000);
+    }
+    if (s_rnd_comet.on) {
+        s_rnd_comet.pos = fmodf(s_rnd_comet.pos + s_rnd_comet.vel + LED_COUNT, LED_COUNT);
+        if (--s_rnd_comet.left == 0) s_rnd_comet.on = false;
+    }
+
+    for (int i = 0; i < LED_COUNT; i++) {
+        rnd_led_t *l = &s_rnd[i];
+        switch (l->phase) {
+        case RND_OFF:
+            if (l->wait) { l->wait--; break; }
+            l->phase  = RND_RISE;
+            l->hue    = frand(0, 1);
+            l->sat    = frand(0.35f, 1);
+            l->target = frand(0.2f, 1);
+            l->step   = (l->target - l->level) / rand_frames(30, 1500);
+            break;
+        case RND_RISE:
+            l->level += l->step;
+            if (l->level >= l->target) {
+                l->level = l->target;
+                l->phase = RND_HOLD;
+                l->wait  = rand_frames(0, 1200);
+            }
+            break;
+        case RND_HOLD:
+            if (l->wait) { l->wait--; break; }
+            l->phase = RND_FALL;
+            l->step  = l->level / rand_frames(80, 2500);
+            break;
+        case RND_FALL:
+            l->level -= l->step;
+            if (l->level <= 0) {
+                l->level = 0;
+                l->phase = RND_OFF;
+                l->wait  = rand_frames(0, 2000);
+            }
+            break;
+        }
+    }
+}
+
+// ⚫ AJOUTÉ (24/10/2026) : (re)démarre le chenillard dans le mode demandé
+static void show_restart(int mode)
+{
+    s_in_fx = 0;
+    if (mode >= 0 && mode < ENC_LED_FX_COUNT) {   // animation choisie à l'écran : en continu
+        s_cur_fx = s_next_fx = mode;
+        s_fx_len = FX_ENDLESS;
+    } else {                                      // ENC_LED_MODE_AUTO : enchaînement 0 -> 6, comme avant
+        s_cur_fx = 0;
+        s_next_fx = 1;
+        s_fx_len = SHOW_EFFECT_FRAMES;
+    }
 }
 
 static void encoder_led_task(void *arg)
@@ -130,6 +263,9 @@ static void encoder_led_task(void *arg)
     uint32_t idle = 0;    // nombre d'images sans action sur l'encodeur
     uint32_t show_t = 0;  // images écoulées depuis le début du chenillard
     float show_mix = 0;   // 0 = interactif, 1 = chenillard (fondu entre les deux)
+    // ⚫ AJOUTÉ (24/10/2026) : mode actuellement appliqué (s_mode peut changer depuis l'écran)
+    int applied_mode = s_mode;
+    show_restart(applied_mode);
 
     for (;;) {
         int16_t now = mt8901_get_count();
@@ -167,7 +303,26 @@ static void encoder_led_task(void *arg)
             show_mix = 0;       // coupure immédiate du chenillard : la main revient à l'utilisateur
         } else if (idle < IDLE_FRAMES) {
             idle++;
-            if (idle == IDLE_FRAMES) show_t = 0;   // départ du chenillard à l'effet n°0
+            // if (idle == IDLE_FRAMES) show_t = 0;   // départ du chenillard à l'effet n°0
+            // ⚫ MODIFIÉ (24/10/2026) : départ du chenillard sur l'animation choisie (ou l'effet n°0 en mode AUTO)
+            if (idle == IDLE_FRAMES) {
+                show_t = 0;
+                show_restart(applied_mode);
+            }
+        }
+        // ⚫ AJOUTÉ (24/10/2026) : nouvelle animation choisie à l'écran
+        int mode = s_mode;
+        if (mode != applied_mode) {
+            applied_mode = mode;
+            show_restart(mode);
+        }
+        // ⚫ AJOUTÉ (24/10/2026) : validation à l'écran -> animation tout de suite, sans attendre l'inactivité
+        // (une fois le bouton relâché, sinon l'appui remettrait idle à 0)
+        if (s_kick && btn == 1) {
+            s_kick = false;
+            idle = IDLE_FRAMES;
+            show_t = 0;
+            show_restart(applied_mode);
         }
         bool show_on = (idle >= IDLE_FRAMES);
         if (show_on && show_mix < 1) show_mix += 1.0f / SHOW_FADEIN_FRAMES;
@@ -175,15 +330,31 @@ static void encoder_led_task(void *arg)
 
         // ⚫ 24/10/2026 : effet courant + fondu enchaîné vers le suivant
         float t = show_t * FRAME_MS / 1000.0f;
-        int fx = (show_t / SHOW_EFFECT_FRAMES) % SHOW_EFFECTS;
-        int fx_next = (fx + 1) % SHOW_EFFECTS;
-        uint32_t in_fx = show_t % SHOW_EFFECT_FRAMES;
+        // int fx = (show_t / SHOW_EFFECT_FRAMES) % SHOW_EFFECTS;
+        // int fx_next = (fx + 1) % SHOW_EFFECTS;
+        // uint32_t in_fx = show_t % SHOW_EFFECT_FRAMES;
+        // float xfade = 0;
+        // if (in_fx > SHOW_EFFECT_FRAMES - SHOW_XFADE_FRAMES) {
+        //     xfade = (float)(in_fx - (SHOW_EFFECT_FRAMES - SHOW_XFADE_FRAMES)) / SHOW_XFADE_FRAMES;
+        // }
+        // ⚫ MODIFIÉ (24/10/2026) : effet courant / suivant gérés par show_restart() :
+        // animation choisie = en continu, mode AUTO = enchaînement avec fondu (mêmes durées qu'avant)
+        int fx = s_cur_fx;
+        int fx_next = s_next_fx;
         float xfade = 0;
-        if (in_fx > SHOW_EFFECT_FRAMES - SHOW_XFADE_FRAMES) {
-            xfade = (float)(in_fx - (SHOW_EFFECT_FRAMES - SHOW_XFADE_FRAMES)) / SHOW_XFADE_FRAMES;
+        if (s_fx_len != FX_ENDLESS && s_in_fx > s_fx_len - SHOW_XFADE_FRAMES) {
+            xfade = (float)(s_in_fx - (s_fx_len - SHOW_XFADE_FRAMES)) / SHOW_XFADE_FRAMES;
         }
         if (show_on) {
             show_t++;
+            // ⚫ AJOUTÉ (24/10/2026) : mode AUTO : passage à l'effet suivant en fin d'effet
+            if (s_fx_len != FX_ENDLESS && ++s_in_fx >= s_fx_len) {
+                s_in_fx = 0;
+                s_cur_fx = s_next_fx;
+                s_next_fx = (s_cur_fx + 1) % SHOW_EFFECTS;
+            }
+            // ⚫ AJOUTÉ (24/10/2026) : animation Random (calculée seulement quand elle est affichée)
+            if (fx == ENC_LED_FX_RANDOM || fx_next == ENC_LED_FX_RANDOM) random_update();
             // étincelles : décroissance + nouvelles étincelles au hasard
             for (int i = 0; i < LED_COUNT; i++) {
                 s_spark[i] *= 0.90f;
@@ -239,8 +410,23 @@ void encoder_led_start(void)
     xTaskCreatePinnedToCore(encoder_led_task, "enc_led", 4 * 1024, NULL, 3, NULL, 0);
 }
 
+// ⚫ AJOUTÉ (24/10/2026) : choix de l'animation depuis la démo "LED animations"
+void encoder_led_set_mode(int mode)
+{
+    s_mode = mode;
+    s_kick = true;
+}
+
+int encoder_led_get_mode(void)
+{
+    return s_mode;
+}
+
 #else
 
 void encoder_led_start(void) {}
+// ⚫ AJOUTÉ (24/10/2026) : anneau désactivé dans menuconfig
+void encoder_led_set_mode(int mode) { (void)mode; }
+int encoder_led_get_mode(void) { return ENC_LED_MODE_AUTO; }
 
 #endif

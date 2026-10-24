@@ -1,6 +1,12 @@
 # ZX2D10GE01R
 ZX2D10GE01R base on https://github.com/espressif/esp-idf/tree/release/v5.0
 
+<!-- ⚫ AJOUTÉ (24/10/2026) : origine du projet -->
+> **Origine :** ce dépôt est un fork de [wireless-tag-com/ZX2D10GE01R-V4848](https://github.com/wireless-tag-com/ZX2D10GE01R-V4848)
+> (projet d'origine du fabricant de la carte : démo LVGL Benchmark). Il y ajoute : toutes les démos LVGL
+> compilables et sélectionnables, un **menu principal** qui les regroupe dans un seul firmware, l'encodeur
+> fonctionnel, l'animation de l'anneau de LED avec une démo de choix des animations, et des firmwares prêts à flasher.
+
 <!-- ⚫ AJOUTÉ (24/10/2026) : usage du projet, démos et pièges de configuration -->
 ## Matériel / environnement
 
@@ -15,6 +21,18 @@ ZX2D10GE01R base on https://github.com/espressif/esp-idf/tree/release/v5.0
 Une seule démo tourne à la fois : celle choisie dans `idf.py menuconfig` → **ZX2D10 Demo** → *Demo to run*
 (Music par défaut).
 
+<!-- ⚫ AJOUTÉ (24/10/2026) : menu principal -->
+**Nouveau défaut : *Main menu (all demos)*.** *Demo to run* propose en premier le **menu principal**, qui regroupe
+toutes les démos dans un seul firmware ; les autres choix produisent, comme avant, un firmware à **une seule démo**.
+
+- **Au démarrage**, l'écran « Démos ZX2D10 » liste Widgets, Keypad & Encoder, Benchmark, Stress, Music et
+  Animations LED : **tourner** l'encodeur pour choisir, **appuyer** pour lancer.
+- La démo choisie démarre après un **redémarrage logiciel** (~1 s) : chaque démo part ainsi d'un état LVGL propre
+  (LVGL 8.3 ne sait pas fermer une démo).
+- **Retour au menu** : maintenir le bouton **3 s** dans n'importe quelle démo ; un anneau de progression « Menu »
+  apparaît après 0,7 s (relâcher pour annuler). Durée réglable : *Main menu: hold the button N ms…*.
+- Un plantage ou un reset pendant une démo ramène au menu.
+
 <!-- ⚫ AJOUTÉ (24/10/2026) : options LVGL activées automatiquement (main/Kconfig.projbuild, `select`) -->
 **Les autres paramètres sont automatiques.** Choisir une démo dans *Demo to run* active automatiquement
 la démo LVGL correspondante et ses options adaptées à cette carte. Il n'est plus nécessaire de passer par
@@ -22,11 +40,13 @@ la démo LVGL correspondante et ses options adaptées à cette carte. Il n'est p
 
 | *Demo to run* | Activé automatiquement |
 |---|---|
+| Main menu (all demos) <!-- ⚫ AJOUTÉ (24/10/2026) --> | toutes les options ci-dessous + l'anneau de LED |
 | Widgets | `LV_USE_DEMO_WIDGETS` (+ `LV_DEMO_WIDGETS_SLIDESHOW`, sans effet en LVGL 8.3.3) et **défilement automatique des onglets** propre au projet (`APP_WIDGETS_AUTOPLAY_MS`, 5 s par défaut) |
 | Keypad and encoder | `LV_USE_DEMO_KEYPAD_AND_ENCODER` |
 | Benchmark | `LV_USE_DEMO_BENCHMARK` + `LV_DEMO_BENCHMARK_RGB565A8` (images adaptées au 16 bits) |
 | Stress | `LV_USE_DEMO_STRESS` |
 | Music | `LV_USE_DEMO_MUSIC` + `LV_DEMO_MUSIC_SQUARE` (480×480) + `LV_DEMO_MUSIC_AUTO_PLAY` |
+| LED animations <!-- ⚫ AJOUTÉ (24/10/2026) --> | `APP_ENCODER_LED` (anneau de LED) |
 
 Restent manuels : la base matérielle (PSRAM, flash, partitions, mémoire et logs LVGL), déjà fixée par `sdkconfig.defaults`,
 et la désactivation éventuelle d'options contraires (ex. *Music → Enable Landscape* doit rester décoché).
@@ -38,6 +58,7 @@ et la désactivation éventuelle d'options contraires (ex. *Music → Enable Lan
 | **Benchmark** | aucune | ~30 scènes animées enchaînées, puis un tableau de résultats (FPS moyen, temps CPU) ; mesuré sur cette carte : **28 FPS pondérés** |
 | **Stress** | aucune | création/suppression d'objets et d'animations en boucle ; la carte ne doit ni planter ni redémarrer |
 | **Music** | ✅ encodeur (boutons du lecteur) | lecteur de musique dont le scénario se déroule seul (*Auto play*) |
+| **Animations LED** <!-- ⚫ AJOUTÉ (24/10/2026) --> | ✅ **encodeur** (rotation + appui) | liste « Animations LED » : tourner pour choisir, appuyer pour lancer l'animation sur l'anneau (voir ci-dessous) |
 
 <!-- ⚫ MODIFIÉ (24/10/2026) : groupe LVGL par défaut + bouton actif bas -> l'encodeur pilote toutes les démos interactives -->
 > **Encodeur uniquement, pas de tactile.** Le bouton rotatif (MT8901, GPIO 5/6) et son bouton-poussoir (GPIO 3)
@@ -55,13 +76,22 @@ et la désactivation éventuelle d'options contraires (ex. *Music → Enable Lan
 > en fondu enchaîné (9 s chacun) : arc-en-ciel tournant, comète arc-en-ciel, comètes croisées de couleurs
 > complémentaires, respiration, étincelles, théâtre, plasma. Toute rotation ou tout appui l'interrompt
 > immédiatement. Délai réglable : *Encoder LED ring → Idle rainbow show after N seconds*.
+>
+> <!-- ⚫ AJOUTÉ (24/10/2026) : démo de choix des animations (main/demo_led.c) -->
+> **Démo « Animations LED ».** Choix à l'écran de l'animation de l'anneau parmi 8 : les 7 effets ci-dessus et
+> **Random**, une animation à part entière où chaque LED s'allume, tient et s'éteint au hasard (couleur, intensité
+> et durées aléatoires), ponctuée de rafales sur tout l'anneau et de comètes de sens, vitesse et couleur aléatoires.
+> L'animation validée démarre aussitôt et tourne **en continu** (sans enchaînement) ; si on touche l'encodeur,
+> l'anneau repasse en suivi de rotation puis l'animation choisie revient après le délai d'inactivité.
+> Hors de cette démo, l'anneau garde l'enchaînement des 7 effets.
 
 <!-- ⚫ AJOUTÉ (24/10/2026) : récapitulatif des options propres au projet -->
 ## Options du projet (`menuconfig` → **ZX2D10 Demo**)
 
 | Option | Défaut | Rôle |
 |---|---|---|
-| *Demo to run* | Music | démo lancée au démarrage (active automatiquement ses options LVGL) |
+| *Demo to run* | Main menu <!-- ⚫ MODIFIÉ (24/10/2026) : était Music --> | menu principal (toutes les démos) ou démo seule lancée au démarrage (active automatiquement ses options LVGL) |
+| *Main menu: hold the button N ms to come back to the menu* <!-- ⚫ AJOUTÉ (24/10/2026) --> | 3000 | durée de l'appui long qui ramène au menu principal (visible avec *Main menu*) |
 | *Widgets: change tab every N ms when idle* | 5000 | défilement automatique des onglets de Widgets (0 = désactivé) |
 | *Encoder LED ring → Animate the encoder LEDs* | ✅ | animation de l'anneau (rotation, appui, chenillard) |
 | *Encoder LED ring → Number of LEDs* | 13 | nombre de LED de l'anneau |
@@ -76,6 +106,10 @@ et la désactivation éventuelle d'options contraires (ex. *Music → Enable Lan
 <!-- ⚫ MODIFIÉ (24/10/2026) : un firmware par démo -->
 Un firmware par démo est fourni dans [`firmware/`](firmware/README.md) :
 `ZX2D10GE01R_demo_widgets.bin`, `…_keypad_encoder.bin`, `…_benchmark.bin`, `…_stress.bin`, `…_music.bin`.
+
+<!-- ⚫ AJOUTÉ (24/10/2026) -->
+Et en plus : `ZX2D10GE01R_demo_all.bin` (**menu principal, toutes les démos**) et `ZX2D10GE01R_demo_led.bin`
+(démo « Animations LED » seule).
 
 ```sh
 esptool.py --chip esp32s3 -p COM4 -b 460800 write_flash 0x0 firmware/ZX2D10GE01R_demo_widgets.bin
@@ -122,6 +156,10 @@ Remplacer le nom du fichier par la démo voulue et `COM4` par le port de la cart
 
    La ligne `MAIN: Demo: …` confirme la démo réellement lancée.
 
+   <!-- ⚫ AJOUTÉ (24/10/2026) -->
+   Avec le menu principal : `MENU: Menu principal` au démarrage, `MENU: Lancement : <démo> (redemarrage)` à la
+   validation, `MAIN: Demo: <démo>` après le redémarrage, `MENU: Appui long : retour au menu` au retour.
+
 6. *(Facultatif)* **Générer le `.bin` de la démo** pour la flasher sans compiler :
 
    ```sh
@@ -148,6 +186,8 @@ Remplacer le nom du fichier par la démo voulue et `COM4` par le port de la cart
 | La carte redémarre à l'appui sur le bouton | flash blanc des 13 LED à 100 % ≈ 0,8 A : alimentation USB insuffisante | port/chargeur USB plus puissant, ou *Encoder LED ring → Max brightness* plus bas |
 | Le chenillard ne démarre jamais | encodeur considéré comme actif en permanence | vérifier le bouton (GPIO 3 doit valoir 1 au repos) |
 | Music : interface tronquée ou décalée | *Landscape* ou *Round* coché en plus de *Square* | *LVGL → Demos* → décocher *Enable Landscape* / *Enable Round* |
+| Le menu principal ne revient pas | appui trop court ou relâché avant la fin de l'anneau « Menu » <!-- ⚫ AJOUTÉ (24/10/2026) --> | maintenir le bouton 3 s (*Main menu: hold the button N ms…*) |
+| Accents remplacés par des carrés dans le menu ou la démo LED <!-- ⚫ AJOUTÉ (24/10/2026) --> | caractère hors des polices générées (`main/font_fr_*.c` : ASCII + Latin-1) | régénérer la police avec la commande indiquée en tête du fichier, plage élargie |
 
 <!-- ⚫ AJOUTÉ (24/10/2026) : pièges rencontrés avec l'extension VS Code ESP-IDF -->
 ## Compiler depuis VS Code (extension ESP-IDF)
@@ -169,12 +209,16 @@ Remplacer le nom du fichier par la démo voulue et `COM4` par le port de la cart
 | `main/main.c` | tâche LVGL, choix de la démo, groupe encodeur, défilement auto de Widgets |
 | `main/screen.c` | initialisation du panneau RGB 480×480 (`full_refresh`), encodeur LVGL (rotation + bouton) |
 | `main/encoder_led.c` | animation de l'anneau de LED : suivi de la rotation, flash, chenillard d'inactivité |
+| `main/encoder_led.h` <!-- ⚫ AJOUTÉ (24/10/2026) --> | choix de l'animation de l'anneau (7 effets + Random) |
+| `main/menu.c`, `main/menu.h` <!-- ⚫ AJOUTÉ (24/10/2026) --> | liste des démos, menu principal, retour au menu par appui long |
+| `main/demo_led.c` <!-- ⚫ AJOUTÉ (24/10/2026) --> | démo « Animations LED » |
+| `main/font_fr_20.c`, `main/font_fr_28.c` <!-- ⚫ AJOUTÉ (24/10/2026) --> | polices Montserrat avec accents (générées par `lv_font_conv`) |
 | `main/Kconfig.projbuild` | menu **ZX2D10 Demo** (démo, défilement, LED) |
 | `components/mt8901` | lecture de la rotation (compteur d'impulsions PCNT, pilote `driver/pulse_cnt.h`) |
 | `components/button` | bouton-poussoir (anti-rebond) |
 | `components/ws2812` | pilote des LED WS2812 via le périphérique RMT |
 | `components/lvgl` | LVGL 8.3.3 et ses démos |
-| `firmware/` | un firmware prêt à flasher par démo |
+| `firmware/` | un firmware prêt à flasher par démo <!-- ⚫ 24/10/2026 : + menu principal (`_all`) et démo LED (`_led`) --> |
 | `sdkconfig.defaults` | valeurs indispensables réappliquées si `sdkconfig` est régénéré |
 
 ## ⚠️ Configuration indispensable (`sdkconfig.defaults`)

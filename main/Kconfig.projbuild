@@ -10,9 +10,30 @@ menu "ZX2D10 Demo"
         prompt "Demo to run"
         # default APP_DEMO_RUN_BENCHMARK
         # ⚫ 24/10/2026 : Music par défaut (firmware de référence fourni dans firmware/)
-        default APP_DEMO_RUN_MUSIC
+        # default APP_DEMO_RUN_MUSIC
+        # ⚫ MODIFIÉ (24/10/2026) : menu principal par défaut (toutes les démos dans un seul firmware)
+        default APP_DEMO_RUN_MENU
         help
             Démo LVGL lancée au démarrage. Les options LVGL nécessaires sont activées automatiquement.
+            "Main menu (all demos)" : toutes les démos dans un seul firmware, choix à l'écran avec l'encodeur.
+            Les autres choix : une seule démo dans le firmware (fonctionnement d'origine).
+
+        # ⚫ AJOUTÉ (24/10/2026) : menu principal : toutes les démos compilées, choix à l'écran avec l'encodeur
+        # (main/menu.c). La démo choisie est lancée après un redémarrage logiciel (état LVGL propre) ;
+        # appui long sur le bouton (APP_MENU_BACK_HOLD_MS) = retour au menu.
+        # Placé dans la même liste que les démos seules : tous les choix restent visibles dans menuconfig.
+        config APP_DEMO_RUN_MENU
+            bool "Main menu (all demos)"
+            select LV_USE_DEMO_WIDGETS
+            select LV_DEMO_WIDGETS_SLIDESHOW
+            select LV_USE_DEMO_KEYPAD_AND_ENCODER
+            select LV_USE_DEMO_BENCHMARK
+            select LV_DEMO_BENCHMARK_RGB565A8
+            select LV_USE_DEMO_STRESS
+            select LV_USE_DEMO_MUSIC
+            select LV_DEMO_MUSIC_SQUARE
+            select LV_DEMO_MUSIC_AUTO_PLAY
+            select APP_ENCODER_LED
 
         config APP_DEMO_RUN_WIDGETS
             bool "Widgets"
@@ -41,14 +62,30 @@ menu "ZX2D10 Demo"
             # ⚫ 24/10/2026 : mise en page carrée (480x480) + lecture automatique (pas de tactile)
             select LV_DEMO_MUSIC_SQUARE
             select LV_DEMO_MUSIC_AUTO_PLAY
+        # ⚫ AJOUTÉ (24/10/2026) : choix de l'animation de l'anneau de LED depuis l'écran (main/demo_led.c)
+        config APP_DEMO_RUN_LED
+            bool "LED animations"
+            select APP_ENCODER_LED
     endchoice
+
+    # ⚫ AJOUTÉ (24/10/2026) : durée de l'appui long qui ramène au menu principal
+    config APP_MENU_BACK_HOLD_MS
+        int "Main menu: hold the button N ms to come back to the menu"
+        range 1000 10000
+        default 3000
+        depends on APP_DEMO_RUN_MENU
+        help
+            Nettement plus long que l'appui long de LVGL (400 ms, passage en édition dans
+            "Keypad and encoder") pour ne pas gêner les démos.
 
     # ⚫ AJOUTÉ (24/10/2026) : défilement automatique des onglets de la démo Widgets
     # (l'option LVGL LV_DEMO_WIDGETS_SLIDESHOW existe dans le menu mais n'est pas codée dans LVGL 8.3.3)
     config APP_WIDGETS_AUTOPLAY_MS
         int "Widgets: change tab every N ms when idle (0 = off)"
         default 5000
-        depends on APP_DEMO_RUN_WIDGETS
+        # depends on APP_DEMO_RUN_WIDGETS
+        # ⚫ MODIFIÉ (24/10/2026) : aussi utilisé quand Widgets est lancé depuis le menu principal
+        depends on APP_DEMO_RUN_WIDGETS || APP_DEMO_RUN_MENU
         help
             Passe à l'onglet suivant toutes les N ms, uniquement si l'encodeur n'a pas été
             utilisé depuis 2 x N ms (l'utilisateur garde la main).
