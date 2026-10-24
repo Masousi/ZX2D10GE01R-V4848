@@ -63,6 +63,12 @@ void qmsd_rgb_init(esp_lcd_rgb_panel_config_t *panel_config)
     disp_drv.draw_buf = &draw_buf;
     disp_drv.hor_res = panel_config->timings.h_res;
     disp_drv.ver_res = panel_config->timings.v_res;
+    // ⚫ AJOUTÉ (24/10/2026) : les 2 buffers LVGL SONT les frame buffers du panneau (double_fb).
+    // esp_lcd_panel_draw_bitmap() ne copie rien dans ce cas : il bascule l'affichage sur ce buffer.
+    // Sans full_refresh, LVGL n'écrit que la zone modifiée, tassée au début du buffer -> dès la 1re
+    // animation, le panneau affiche un buffer quasi vide : écran noir (Widgets, Music en auto play…).
+    // full_refresh : chaque image est redessinée entièrement dans le buffer suivant (cf. exemple IDF rgb_panel).
+    disp_drv.full_refresh = 1;
     lv_disp_drv_register(&disp_drv);
 }
 
@@ -409,8 +415,13 @@ void __qsmd_encoder_init(void)
 {
     static lv_indev_drv_t indev_drv;
 
-    g_btn = button_attch(3, 1, 10);
-    mt8901_init(5,6);
+    // g_btn = button_attch(3, 1, 10);
+    // ⚫ MODIFIÉ (24/10/2026) : le bouton est actif à l'état BAS (GPIO3 = 1 au repos avec pull-up, 0 appuyé).
+    // Avec press_value = 1, LVGL voyait le bouton appuyé en permanence et ignore alors la rotation
+    // (lv_indev.c : "enc_diff valid only with released button") -> l'encodeur ne faisait rien.
+    g_btn = button_attch(BTN_PIN, 0, 10);
+    // mt8901_init(5,6);
+    mt8901_init(ENCODER_A_PIN, ENCODER_B_PIN);
 
     lv_indev_drv_init(&indev_drv);
     indev_drv.read_cb = __qmsd_encoder_read;

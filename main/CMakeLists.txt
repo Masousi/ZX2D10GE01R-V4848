@@ -16,7 +16,9 @@ file(GLOB LVGL_DEMOS
 idf_component_register(
     SRC_DIRS ${DIRS} ${LVGL_DEMOS} "."
     INCLUDE_DIRS "." ${LVGL_DEMOS} ${DIRS}
-    REQUIRES esp_lcd driver lvgl esp_timer button mt8901
+    # REQUIRES esp_lcd driver lvgl esp_timer button mt8901
+    # ⚫ MODIFIÉ (24/10/2026) : + ws2812 (LED de l'encodeur)
+    REQUIRES esp_lcd driver lvgl esp_timer button mt8901 ws2812
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE "-Wno-format")

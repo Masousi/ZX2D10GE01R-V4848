@@ -43,4 +43,49 @@ menu "ZX2D10 Demo"
             select LV_DEMO_MUSIC_AUTO_PLAY
     endchoice
 
+    # ⚫ AJOUTÉ (24/10/2026) : défilement automatique des onglets de la démo Widgets
+    # (l'option LVGL LV_DEMO_WIDGETS_SLIDESHOW existe dans le menu mais n'est pas codée dans LVGL 8.3.3)
+    config APP_WIDGETS_AUTOPLAY_MS
+        int "Widgets: change tab every N ms when idle (0 = off)"
+        default 5000
+        depends on APP_DEMO_RUN_WIDGETS
+        help
+            Passe à l'onglet suivant toutes les N ms, uniquement si l'encodeur n'a pas été
+            utilisé depuis 2 x N ms (l'utilisateur garde la main).
+
+    # ⚫ AJOUTÉ (24/10/2026) : anneau de LED WS2812 de l'encodeur (GPIO LED_PIN = 4)
+    menu "Encoder LED ring"
+        config APP_ENCODER_LED
+            bool "Animate the encoder LEDs when turning / pressing"
+            default y
+        config APP_ENCODER_LED_COUNT
+            int "Number of LEDs"
+            range 1 64
+            default 13
+            depends on APP_ENCODER_LED
+        config APP_ENCODER_LED_REVERSE
+            bool "Reverse direction"
+            default n
+            depends on APP_ENCODER_LED
+            help
+                À cocher si la lumière tourne dans le sens inverse du bouton.
+        config APP_ENCODER_LED_BRIGHTNESS
+            int "Max brightness (1-255)"
+            range 1 255
+            # default 80
+            # ⚫ 24/10/2026 : 100 % demandé. Attention : flash blanc des 13 LED à 100 % ≈ 0,8 A ;
+            # si la carte redémarre à l'appui (alimentation USB trop faible), baisser cette valeur.
+            default 255
+            depends on APP_ENCODER_LED
+        # ⚫ AJOUTÉ (24/10/2026) : chenillard multicolore quand l'encodeur n'est pas utilisé
+        config APP_ENCODER_LED_IDLE_S
+            int "Idle rainbow show after N seconds without encoder activity"
+            range 1 600
+            default 5
+            depends on APP_ENCODER_LED
+            help
+                Après N secondes sans rotation ni appui, l'anneau enchaîne 7 effets multicolores
+                (fondus enchaînés). Toute action sur l'encodeur l'interrompt immédiatement.
+    endmenu
+
 endmenu

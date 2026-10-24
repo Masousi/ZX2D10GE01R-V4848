@@ -40,3 +40,6 @@ CONFIG_LV_USE_DEMO_STRESS=y
 CONFIG_LV_USE_DEMO_MUSIC=y
 CONFIG_LV_DEMO_MUSIC_SQUARE=y
 CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
+# ⚫ 24/10/2026 : nécessaire aux widgets semi-transparents (opa / transform) des démos Music et Benchmark :
+# sans cela LVGL logue "Rendering this widget needs LV_COLOR_SCREEN_TRANSP 1" et ne les dessine pas
+CONFIG_LV_COLOR_SCREEN_TRANSP=y
