@@ -21,6 +21,9 @@ static void increase_lvgl_tick(void* arg) {
 extern void screen_init(void);
 
 void lvgl_task(void* arg) {
+    // ⚫ AJOUTÉ (24/10/2026) : screen_init() alloue le frame buffer RGB 480x480 en PSRAM.
+    // Si CONFIG_SPIRAM est désactivé (sdkconfig régénéré), l'allocation échoue -> panic -> écran noir.
+    // Les valeurs requises sont figées dans sdkconfig.defaults.
     screen_init();
 
     // Tick interface for LVGL
@@ -61,6 +64,7 @@ void lvgl_task(void* arg) {
     }
 }
 
+// ⚫ AJOUTÉ (24/10/2026) : app_main rend la main tout de suite ; LVGL tourne dans sa propre tâche sur le cœur 1
 void app_main(void) {
     xTaskCreatePinnedToCore(lvgl_task, NULL, 8 * 1024, NULL, 5, NULL, 1);
 }
