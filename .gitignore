@@ -1,0 +1,4 @@
+# ⚫ AJOUTÉ (24/10/2026) : fichiers générés / locaux exclus du dépôt
+build/
+.vscode/
+sdkconfig.old

@@ -2,4 +2,6 @@
 # Note: if you have increased the bootloader size, make sure to update the offsets to avoid overlap,,,,
 nvs,      data, nvs,     ,        0x6000,
 phy_init, data, phy,     ,        0x1000,
-factory,  app,  factory, ,        3M,
+# ⚫ MODIFIÉ (24/10/2026) : factory 3M -> 8M pour contenir toutes les démos LVGL (assets music lourds), flash 16 Mo
+# factory,  app,  factory, ,        3M,
+factory,  app,  factory, ,        8M,

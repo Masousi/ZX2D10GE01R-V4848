@@ -1,0 +1,27 @@
+# ⚫ AJOUTÉ (24/10/2026) : sélection de la démo LVGL lancée au démarrage.
+# Une seule démo peut tourner à la fois (chacune prend l'écran actif) ;
+# seules les démos activées dans Component config > LVGL > Demos sont proposées.
+menu "ZX2D10 Demo"
+
+    choice APP_DEMO_RUN
+        prompt "Demo to run"
+        default APP_DEMO_RUN_BENCHMARK
+
+        config APP_DEMO_RUN_WIDGETS
+            bool "Widgets"
+            depends on LV_USE_DEMO_WIDGETS
+        config APP_DEMO_RUN_KEYPAD_ENCODER
+            bool "Keypad and encoder"
+            depends on LV_USE_DEMO_KEYPAD_AND_ENCODER
+        config APP_DEMO_RUN_BENCHMARK
+            bool "Benchmark"
+            depends on LV_USE_DEMO_BENCHMARK
+        config APP_DEMO_RUN_STRESS
+            bool "Stress"
+            depends on LV_USE_DEMO_STRESS
+        config APP_DEMO_RUN_MUSIC
+            bool "Music"
+            depends on LV_USE_DEMO_MUSIC
+    endchoice
+
+endmenu

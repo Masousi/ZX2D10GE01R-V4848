@@ -1,8 +1,16 @@
 idf_component_get_property(LVGL_DIR lvgl COMPONENT_DIR)
 
-file(GLOB LVGL_DEMOS 
+# ⚫ MODIFIÉ (24/10/2026) : ajout de toutes les démos LVGL (le composant lvgl 8.3.3 ne compile que src/).
+# Chaque fichier de démo est protégé par son #if LV_USE_DEMO_xxx : une démo désactivée compile vide.
+file(GLOB LVGL_DEMOS
     ${LVGL_DIR}/demos/benchmark
     ${LVGL_DIR}/demos/benchmark/assets
+    ${LVGL_DIR}/demos/widgets
+    ${LVGL_DIR}/demos/widgets/assets
+    ${LVGL_DIR}/demos/keypad_encoder
+    ${LVGL_DIR}/demos/stress
+    ${LVGL_DIR}/demos/music
+    ${LVGL_DIR}/demos/music/assets
 )
 
 idf_component_register(
