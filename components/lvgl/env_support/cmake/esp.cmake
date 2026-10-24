@@ -27,7 +27,13 @@ else()
   target_compile_definitions(${COMPONENT_LIB} PUBLIC "-DLV_CONF_INCLUDE_SIMPLE")
 
   if(CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM)
+    # target_compile_definitions(${COMPONENT_LIB}
+    #                            PUBLIC "-DLV_ATTRIBUTE_FAST_MEM=IRAM_ATTR")
+    # ⚫ MODIFIÉ (24/10/2026) : IRAM_ATTR génère un nom de section unique par usage (".iram1.<__COUNTER__>").
+    # LVGL l'applique à la déclaration ET à la définition -> ~40 warnings "ignoring attribute 'section'
+    # because it conflicts with previous" [-Wattributes]. Une section fixe ".iram1.lvgl" (toujours placée
+    # en IRAM par la règle ".iram1+" de esp_common/soc.lf) donne le même placement, sans conflit.
     target_compile_definitions(${COMPONENT_LIB}
-                               PUBLIC "-DLV_ATTRIBUTE_FAST_MEM=IRAM_ATTR")
+                               PUBLIC "LV_ATTRIBUTE_FAST_MEM=__attribute__((section(\".iram1.lvgl\")))")
   endif()
 endif()

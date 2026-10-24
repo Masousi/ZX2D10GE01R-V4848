@@ -1,27 +1,46 @@
 # ⚫ AJOUTÉ (24/10/2026) : sélection de la démo LVGL lancée au démarrage.
 # Une seule démo peut tourner à la fois (chacune prend l'écran actif) ;
 # seules les démos activées dans Component config > LVGL > Demos sont proposées.
+# ⚫ MODIFIÉ (24/10/2026) : choisir une démo active automatiquement (select) la démo LVGL et ses options utiles
+# sur cette carte (écran carré 480x480, encodeur sans tactile). Plus besoin de passer par LVGL > Demos.
+# Les anciens "depends on LV_USE_DEMO_xxx" sont retirés : ils masquaient le choix tant que la démo n'était pas activée.
 menu "ZX2D10 Demo"
 
     choice APP_DEMO_RUN
         prompt "Demo to run"
-        default APP_DEMO_RUN_BENCHMARK
+        # default APP_DEMO_RUN_BENCHMARK
+        # ⚫ 24/10/2026 : Music par défaut (firmware de référence fourni dans firmware/)
+        default APP_DEMO_RUN_MUSIC
+        help
+            Démo LVGL lancée au démarrage. Les options LVGL nécessaires sont activées automatiquement.
 
         config APP_DEMO_RUN_WIDGETS
             bool "Widgets"
-            depends on LV_USE_DEMO_WIDGETS
+            # depends on LV_USE_DEMO_WIDGETS
+            select LV_USE_DEMO_WIDGETS
+            # ⚫ 24/10/2026 : pas de tactile -> diaporama automatique des onglets pour voir la démo évoluer
+            select LV_DEMO_WIDGETS_SLIDESHOW
         config APP_DEMO_RUN_KEYPAD_ENCODER
             bool "Keypad and encoder"
-            depends on LV_USE_DEMO_KEYPAD_AND_ENCODER
+            # depends on LV_USE_DEMO_KEYPAD_AND_ENCODER
+            select LV_USE_DEMO_KEYPAD_AND_ENCODER
         config APP_DEMO_RUN_BENCHMARK
             bool "Benchmark"
-            depends on LV_USE_DEMO_BENCHMARK
+            # depends on LV_USE_DEMO_BENCHMARK
+            select LV_USE_DEMO_BENCHMARK
+            # ⚫ 24/10/2026 : images RGB565A8, adaptées à la profondeur de couleur 16 bits de l'écran
+            select LV_DEMO_BENCHMARK_RGB565A8
         config APP_DEMO_RUN_STRESS
             bool "Stress"
-            depends on LV_USE_DEMO_STRESS
+            # depends on LV_USE_DEMO_STRESS
+            select LV_USE_DEMO_STRESS
         config APP_DEMO_RUN_MUSIC
             bool "Music"
-            depends on LV_USE_DEMO_MUSIC
+            # depends on LV_USE_DEMO_MUSIC
+            select LV_USE_DEMO_MUSIC
+            # ⚫ 24/10/2026 : mise en page carrée (480x480) + lecture automatique (pas de tactile)
+            select LV_DEMO_MUSIC_SQUARE
+            select LV_DEMO_MUSIC_AUTO_PLAY
     endchoice
 
 endmenu
