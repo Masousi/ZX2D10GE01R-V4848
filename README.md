@@ -1,5 +1,12 @@
 # ZX2D10GE01R
-ZX2D10GE01R base on https://github.com/espressif/esp-idf/tree/release/v5.0
+<!-- ⚫ MODIFIÉ (25/10/2026) : description plus claire pour un dépôt public -->
+<!-- ZX2D10GE01R base on https://github.com/espressif/esp-idf/tree/release/v5.0 -->
+Démos LVGL pour la carte **ZX2D10GE01R-V4848** (bouton rotatif ESP32-S3 avec écran 480×480, encodeur et
+anneau de LED), basées sur [ESP-IDF v5.0](https://github.com/espressif/esp-idf/tree/release/v5.0).
+
+> *English:* LVGL demos for the ZX2D10GE01R-V4848 knob display (ESP32-S3). Clone, build with **ESP-IDF v5.0.9**
+> (`idf.py build`), then `idf.py -p <PORT> flash monitor` — no changes needed. Prebuilt images are in `firmware/`
+> (flash at `0x0`). Documentation below is in French.
 
 <!-- ⚫ AJOUTÉ (24/10/2026) : origine du projet -->
 > **Origine :** ce dépôt est un fork de [wireless-tag-com/ZX2D10GE01R-V4848](https://github.com/wireless-tag-com/ZX2D10GE01R-V4848)
@@ -15,11 +22,39 @@ ZX2D10GE01R base on https://github.com/espressif/esp-idf/tree/release/v5.0
 - Encodeur : rotation sur GPIO 5/6 (MT8901), bouton-poussoir sur GPIO 3 (actif bas), anneau de **13 LED WS2812** sur GPIO 4.
 - ESP-IDF **v5.0.9**.
 
+<!-- ⚫ AJOUTÉ (25/10/2026) : démarrage rapide pour un utilisateur qui clone le dépôt (projet rendu public) -->
+## Démarrage rapide
+
+Le dépôt est **autonome** : LVGL 8.3.3 est inclus dans `components/lvgl` (aucun téléchargement de composant)
+et le `sdkconfig` versionné est déjà réglé pour la carte (PSRAM, flash 16 Mo, partitions, menu principal).
+Aucune modification n'est nécessaire pour compiler.
+
+**Prérequis :** [ESP-IDF **v5.0.9**](https://docs.espressif.com/projects/esp-idf/en/v5.0.9/esp32s3/get-started/index.html)
+installé (seule version testée ; les API `esp_lcd` / `pulse_cnt` utilisées peuvent différer en v5.1+), et un
+câble USB vers le port série de la carte (puce CH343 : installer son pilote sous Windows si le port n'apparaît pas).
+
+```sh
+git clone https://github.com/Masousi/ZX2D10GE01R-V4848.git
+cd ZX2D10GE01R-V4848
+# activer l'environnement ESP-IDF v5.0.9 : ". $IDF_PATH/export.sh" (Linux/macOS) ou "%IDF_PATH%\export.bat" (Windows)
+idf.py build
+idf.py -p <PORT> flash monitor      # <PORT> : COM4, /dev/ttyACM0, /dev/ttyUSB0…
+```
+
+- **Windows : cloner dans un chemin court et sans espace** (ex. `C:\esp\ZX2D10`). Les chemins d'objets de LVGL
+  et d'ESP-IDF sont longs : au-delà de ~250 caractères, le build échoue (`opening dependency file … No such file
+  or directory`). Constaté le 25/10/2026 avec un clone sous `%TEMP%`. <!-- ⚫ AJOUTÉ (25/10/2026) -->
+- **Ne pas lancer `idf.py set-target esp32s3`** : la cible est déjà fixée, et cette commande régénère `sdkconfig`
+  (voir [Configuration indispensable](#️-configuration-indispensable-sdkconfigdefaults)).
+- Au démarrage, l'écran affiche le **menu principal** : tourner l'encodeur pour choisir une démo, appuyer pour la lancer.
+- Sans installer ESP-IDF : flasher directement un firmware fourni (voir *Option A* plus bas).
+
 ## Démos LVGL disponibles
 
 <!-- ⚫ MODIFIÉ (24/10/2026) : la procédure Music est généralisée à toutes les démos (LVGL 8.3) -->
+<!-- ⚫ MODIFIÉ (25/10/2026) : défaut = menu principal (était « Music par défaut ») -->
 Une seule démo tourne à la fois : celle choisie dans `idf.py menuconfig` → **ZX2D10 Demo** → *Demo to run*
-(Music par défaut).
+(menu principal par défaut).
 
 <!-- ⚫ AJOUTÉ (24/10/2026) : menu principal -->
 **Nouveau défaut : *Main menu (all demos)*.** *Demo to run* propose en premier le **menu principal**, qui regroupe
@@ -116,6 +151,11 @@ esptool.py --chip esp32s3 -p COM4 -b 460800 write_flash 0x0 firmware/ZX2D10GE01R
 ```
 
 Remplacer le nom du fichier par la démo voulue et `COM4` par le port de la carte (puce USB-série CH343).
+
+<!-- ⚫ AJOUTÉ (25/10/2026) : flasher sans ESP-IDF -->
+Sans ESP-IDF : `pip install esptool` suffit (la commande s'appelle alors `esptool.py` ou `esptool`), ou l'outil web
+[esptool-js](https://espressif.github.io/esptool-js/) depuis Chrome/Edge (adresse `0x0`). Les SHA-256 des fichiers
+sont listés dans [`firmware/README.md`](firmware/README.md).
 
 ### Option B : compiler la démo de son choix
 
@@ -229,3 +269,11 @@ L'écran a besoin de la **PSRAM** pour son frame buffer. Sans elle, le firmware 
 `idf.py set-target` (ou *ESP-IDF: Set Espressif Device Target* dans VS Code) régénère `sdkconfig`.
 Les valeurs indispensables (PSRAM octale 80 MHz, flash 16 Mo, `partitions_lvgl.csv`, CPU 240 MHz,
 démos LVGL) sont donc reprises dans `sdkconfig.defaults` et réappliquées automatiquement.
+
+<!-- ⚫ AJOUTÉ (25/10/2026) : licences (dépôt public) -->
+## Licence
+
+- Code du projet : domaine public ([Unlicense](LICENSE.md)), comme le dépôt d'origine du fabricant.
+- `components/lvgl` : LVGL 8.3.3, licence MIT ([`components/lvgl/LICENCE.txt`](components/lvgl/LICENCE.txt)).
+  Seul `env_support/cmake/esp.cmake` y est modifié (section IRAM fixe, voir le commentaire dans le fichier).
+- `main/font_fr_*.c` : police Montserrat (SIL Open Font License) convertie avec `lv_font_conv`.
